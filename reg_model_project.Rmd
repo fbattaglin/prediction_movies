@@ -1,0 +1,231 @@
+---
+title: "Modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: sandstone
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+library(gridExtra)
+```
+
+### Load data
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+The dataset contains information about movies in Rotten Tomatoes and IMDB. Both are considered review-aggregation websites for films. 
+On IMDb, all films are given an overall rating out of ten. In a roundabout way, these ratings are derived from votes submitted by IMDb users, not movie critics.
+Rotten Tomatoes gives films a score out of 100 based on the averaged reviews of professional film critics.The website also separately ranks film by user scores, but let’s not get distracted by that here.
+
+### Metodology and Sampling
+There are 651 randomly sampled movies produced and released before 2016. There are 32 available variables.  Note that the sample size is very small, compared with the population of movie watchers as a whole, which also does not allow us to draw conclusions. This is an observational study therefore we cannot establish causality.
+
+##### Some Possible Sources of Bias
+- The data is collected from movie fans, therefore may not represent the average movie goer. It is possibe these can be sources of **sampling bias**.
+- The study sampling is random, however, so the results are generalizable to movies produced and released before 2016 in the US. However, it will not be generalizable to all movies released in **all parts of the world**.
+
+* * *
+
+## Part 2: Research question
+
+Should you watch a movie? Well, there are a lot of factors to consider, such as the director, the actors, and the movie’s budget. Some of us base our decision off of a review, a short trailer, genre, or just by checking the critics rating. 
+
+>Can we predict how audiences on Rotten Tomatoes will score a movie based on the critics score, genre, academy awards nomination, or the IMDb score?
+
+In order to address this question we will focus on the following variables:
+
++ **critics_score**: Critics score on Rotten Tomatoes. Data type: *numeric*
++ **audience_score**: Audience score on Rotten Tomatoes. Data type: *numeric*
++ **genre**: Genre of movie (Action & Adventure, Comedy, Documentary, Drama, Horror, Mystery & Suspense, Other). Data type: *categorical* / Factor
++ **best_pic_nom**: Whether or not the movie was nominated for a best picture Oscar (no, yes). Data type: *categorical*
++ **imdb_rating**: Rating on IMDB. Data type: *numeric*
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+First we need to subset some variables, that will make the data a lot easier to visualize and to work with. Than we will genarate a summary in order to have an overall view of the distribution between the variables.
+
+```{r}
+#function to create summary of chosen variables
+moviesSummary <- function(i) {
+  summary(movies[i])
+}
+#vector containing the columns selected
+proj <- c("critics_score", "audience_score", "imdb_rating", "genre", "best_pic_nom" )
+#run function
+moviesSummary(proj)
+
+```
+
+
+**Observation** 
+We can observe in that summary that the audience score and IMBD score have similar 
+very similar mean and median (despite of the IMBD score being based on a diferent scale, with different decimals). The critics score average and mean are a little lower than the others. 
+We also notice that only 3,4% of movies in the sample get a best picture nomination.
+The random sample seem to select a lot more movies of the genre drama, however it is possible that it is a real representation of the population (movies produced in US).
+
+
+Next we can analize if audiences tend to score higher a specific genre compared to the others.
+
+```{r}
+ggplot(movies, aes(x=factor(genre), y=audience_score)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_hline(yintercept =median(movies$audience_score), col = "royalblue",lwd = 1) +
+  labs(x="Genre",y="Audience Score",title="Audience score by Genre")
+
+
+```
+
+**Observation** 
+
+Based on that plot, we can assume that audience tend to score better *documentaries* and *musicals*, and give lower rates to *horror* movies. Also people tend to be more inconsistent about *sci-fi* movies, which the scores vary a lot. What somehow makes sense if you think about sci-fi movies that people love like *Star Wars* and *Lord of the Rings*; and some that get really bad reviews like *The Transformers*.
+
+Now we will analyze if the distribution of the audience and the critics score have different patterns using a histogram.
+
+```{r}
+p1 <- ggplot(movies, aes(x=audience_score))+ geom_histogram(binwidth = 1) + geom_histogram() + labs(title="Audience Score")
+
+p2 <- ggplot(movies, aes(x=critics_score))+ geom_histogram(binwidth = 1) + geom_histogram() + labs(title="Critics Score")
+
+grid.arrange(p1, p2, nrow = 2)
+```
+
+**Observation** 
+
+As we can see above, crtics tend to give more high scores than the audiences, but the also give more low scores. 
+
+Next we will explore the relationship between the two variables: critics score and audience score. 
+
+```{r}
+ggplot(data = movies, aes(x = critics_score, y = audience_score)) + 
+  geom_jitter() +  geom_smooth(method = "lm")
+
+```
+
+
+**Observation** 
+
+As we can see on the plot, there is a positive relationship between the variables. Further we will explore how strong this relationship is, and if we should we the variable *critics score* in our model to predict the *audience score*. Stay tuned! ;)
+
+
+* * *
+
+## Part 4: Modeling
+
+Now we will develop a multiple linear regression model to predict the how the audiences will score a movie. First we will create a full model using the audience score as the response variable; and critics score, genre, academy awards nomination, and the IMDb score as the explanatory variables.
+
+```{r}
+m1 <- lm(audience_score ~ critics_score + genre + best_pic_nom + imdb_rating, data= movies)
+
+summary(m1)
+```
+
+In order for the multiple regression model to be valid it will be necessary that: 
+
+* There is a linear relationship between any numerical predictor variables,
+* The residuals are nearly normally distributed, 
+* The residuals display constant variability
+* The residuals are independent.
+
+
+There is a linear relationship between some numerical predictor variables (critics score and imdb rating). Most categories in the variable genre have no relationship with the audience's score, however some categories present a somehow strong relationship (Horror, Animation, and specially Mystery & Suspense), therefore we should not discard it from the model yet.
+The variable best_pic_nom have a very weak relation with the response variable, so it will be discarded from the model.
+
+Now we will try the model with and withou the variable **genre**, using the ** Adjusted R squared method** .
+
+```{r}
+#model with variable genre
+m2 <- lm(audience_score ~ critics_score + genre + imdb_rating, data=movies)
+summary(m2)$adj.r.squared
+
+#model without variable genre
+m3 <- lm(audience_score ~ critics_score + imdb_rating, data=movies)
+summary(m3)$adj.r.squared
+```
+
+**Observation** 
+
+The Adjusted R squared method shows that we should stick to the variable genre, and use it for further exploration of our model.
+
+
+Next we have to test our selected model on the following criteria: 
+* The residuals are nearly normally distributed, 
+* The residuals display constant variability 
+
+
+```{r}
+#residual plot
+ggplot(data = m2, aes(x = .fitted, y = .resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  xlab("Fitted values") +
+  ylab("Residuals")
+
+#residual histogram
+ggplot(data = m2, aes(x = .resid)) +
+  geom_histogram() +
+  xlab("Residuals")
+
+#normal probability plot of the residuals
+ggplot(data = m2, aes(sample = .resid)) +
+  stat_qq()
+```
+
+**Observation** 
+For model dignostics, the following conditions were checked using the plots provided above. - linear relationships between x and y - nearly normal residuals - constant variability of residuals - independence of residuals.
+
+The model dignostic plots suggest a strong linear relationship as demostrated by the residual plot which shows the residuals randomly scattered around 0 showing normal distribution of residuals centered at 0. 
+
+```{r}
+summary(m2)
+```
+
+The *small p value (2.2e-16)* and the *Adjusted R-squared (0.7643)* show that we can use our model as a predictor for the audience score.
+
+* * *
+
+## Part 5: Prediction
+
+Finally, the model is used to predict the audience score for the movie “Deadpool” which was released in February 2016. The values for the predictor values were obtained from the sources mentioned in the codebook.
+
+```{r}
+movie1 <- data.frame(title_type="Deadpool",
+                     genre="Comedy",
+                     imdb_rating=8.0,
+                     critics_rating="Certified Fresh",
+                     critics_score=83)
+
+predict(m2, movie1, interval="confidence")
+```
+
+**The value obtained (88.62) is very close to the actual audience score of 90 for the movie “Deadpool”** ; and, based on the confidence interval, we can be 95% confident that the actual audience score for this particular movie has a lower bound of approximately 85.89 and a higher bound of approximately 91.35.
+
+
+
+* * *
+
+## Part 6: Conclusion
+
+In conclusion, the predictive model presented here may be used to predict audience scores for a movie. It should be noted that the model is based on a very small sample of 651 movies. Therefore it would probably work best if we had opportunity to work with a larger sample.
+
+We could also try adding some different variables in the future like audience_rating, best_pic_win, top200_box, or others.
