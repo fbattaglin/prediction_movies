@@ -1,3 +1,6 @@
+RESULTS:
+https://fbattaglin.github.io/prediction_movies/reg_model_project.html
+
 # prediction_movies
 
 The dataset contains information about movies in Rotten Tomatoes and IMDB. Both are considered review-aggregation websites for films. 
